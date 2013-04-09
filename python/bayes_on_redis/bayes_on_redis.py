@@ -1,6 +1,6 @@
 import operator, math, os.path, re
 from redis import Redis
-
+import mmseg
 class BayesOnRedis:
     categories_key = "BayesOnRedis:categories"
     one_or_two_words_re = re.compile(r"\b[^\s]{1,2}\b", re.IGNORECASE)
@@ -63,7 +63,7 @@ class BayesOnRedis:
 
 
     def classify(self, text):
-        return sorted(self.score(text).iteritems(), key=operator.itemgetter(1))[-1][0]
+        return sorted(self.score(text).iteritems(), key=operator.itemgetter(1))[-5:]
 
 
     def redis_category_key(self, category):
@@ -75,14 +75,17 @@ class BayesOnRedis:
         if not isinstance(text, basestring):
             raise Exception("input must be instance of String")
 
-        separated_by_non_alphanumerics = self.__class__.non_alphanumeric_and_non_dot_re.sub(' ', text.lower())
+        separated_by_non_alphanumerics = text.replace('/',' ').replace('\\',' ').replace('>',' ').replace('<',' ').lower()
+        #print separated_by_non_alphanumerics
         without_one_or_two_words = self.__class__.one_or_two_words_re.sub('', separated_by_non_alphanumerics)
         without_dots = without_one_or_two_words.replace(".", "")
         text_chunks = self.stopwords.to_re().sub('', without_dots).split()
-
+        
         frequencies = {}
         for word in text_chunks:
-            frequencies[word] = (frequencies[word] if frequencies.has_key(word) else 0) + 1
+            seg = mmseg.seg_txt(word)
+            for s in seg:
+                frequencies[s] = (frequencies[s] if frequencies.has_key(s) else 0) + 1
 
         return frequencies
 
